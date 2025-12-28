@@ -1,0 +1,1 @@
+ALTER TABLE "tickets" ADD COLUMN "assigned_to_name" varchar(255);
