@@ -14,15 +14,7 @@ import {
 // Role enum
 export const roleEnum = pgEnum("role_enum", ["admin", "employee"]);
 
-//export const unitEnum = pgEnum("unit_enum", ["unit-1", "unit-2", "unit-3"]);
 
-// Ticket status enum
-// export const ticketStatusEnum = pgEnum("ticket_status_enum", [
-//   "pending",
-//   "in_progress",
-//   "resolved",
-//   "closed",
-// ]);
 export const ticketStatusEnum = pgEnum("ticket_status_enum", [
   "Open",
   "In Progress",
@@ -32,15 +24,11 @@ export const ticketStatusEnum = pgEnum("ticket_status_enum", [
 ]);
 
 
+// src/db/schema/equipments.ts
+import {  numeric } from "drizzle-orm/pg-core";
+//import { units } from "./units";
 
-// Units table (3 units for hospital)
-export const units = pgTable("units", {
-  id: serial("id").primaryKey(),
-  name: varchar("name", { length: 100 }).notNull(),
-  code: varchar("code", { length: 20 }).notNull().unique(),
-});
 
-// Users table
 export const users = pgTable("users", {
   id: serial("id").primaryKey(),
   name: varchar("name", { length: 100 }).notNull(),
@@ -53,50 +41,49 @@ export const users = pgTable("users", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
-// Tickets table
+export const units = pgTable("units", {
+  id: serial("id").primaryKey(),
+  name: varchar("name", { length: 100 }).notNull(),
+  code: varchar("code", { length: 20 }).notNull().unique(),
+});
 
-// export const tickets = pgTable("tickets", {
-//   id: serial("id").primaryKey(),
-//   title: varchar("title", { length: 255 }).notNull(),
-//   description: text("description"),
-//   category: varchar("category", { length: 100 }).notNull(),
-//   priority: varchar("priority", { length: 50 }).notNull(),
-//   status: ticketStatusEnum("status").notNull().default("pending"),
+export const equipments = pgTable("equipments", {
+  id: serial("id").primaryKey(),
 
-//   unitId: integer("unit_id").references(() => units.id).notNull(),
-//   equipmentId: integer("equipment_id"),
+  name: text("name").notNull(),
+  category: text("category").notNull(),
 
-//   createdById: integer("created_by_id")
-//     .notNull()
-//     .references(() => users.id),
+  manufacturer: text("manufacturer").notNull(),
+  model: text("model").notNull(),
 
-//   assignedToId: integer("assigned_to_id").references(() => users.id),
+  serialNumber: text("serial_number").notNull(),
 
-//   createdAt: timestamp("created_at").defaultNow().notNull(),
-//   updatedAt: timestamp("updated_at").defaultNow(),
-// });
-// export const tickets = pgTable("tickets", {
-//   id: serial("id").primaryKey(),
-//   title: varchar("title", { length: 255 }).notNull(),
-//   description: text("description"),
+  // department / location shown in UI
+  location: text("location").notNull(),
 
-//   category: varchar("category", { length: 100 }).notNull(),   // REQUIRED
-//   priority: varchar("priority", { length: 50 }).notNull(),
+  status: text("status")
+    .$type<"Active" | "Maintenance" | "Retired" | "Out of Order">()
+    .notNull()
+    .default("Active"),
 
-//   status: ticketStatusEnum("status").notNull().default("pending"),
+  nextMaintenance: timestamp("next_maintenance"),
+  purchaseDate: timestamp("purchase_date"),
+  warrantyExpiry: timestamp("warranty_expiry"),
+  lastMaintenance: timestamp("last_maintenance"),
 
-//   unitId: integer("unit_id").references(() => units.id).notNull(),
-//   equipmentId: integer("equipment_id"),
+  cost: numeric("cost", { precision: 12, scale: 0 }).notNull(),
 
-//   createdById: integer("created_by_id")
-//     .notNull()
-//     .references(() => users.id),
+  // for unit-based filtering (important)
+  unitId: integer("unit_id")
+    .references(() => units.id)
+    .notNull(),
 
-//   assignedToId: integer("assigned_to_id").references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
 
-//   createdAt: timestamp("created_at").defaultNow().notNull(),
-//   updatedAt: timestamp("updated_at").defaultNow(),
-// });
+
+
 export const tickets = pgTable("tickets", {
   id: serial("id").primaryKey(),
 
@@ -129,4 +116,28 @@ export const tickets = pgTable("tickets", {
 
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow(),
+});
+export const ticketAssignments = pgTable("ticket_assignments", {
+  id: serial("id").primaryKey(),
+
+  ticketId: integer("ticket_id")
+    .notNull()
+    .references(() => tickets.id),
+
+  assignedToId: integer("assigned_to_id")
+    .notNull()
+    .references(() => users.id),
+
+  assignedById: integer("assigned_by_id")
+    .notNull()
+    .references(() => users.id), // admin
+
+  // optional equipment list (array of equipment ids)
+  equipmentIds: integer("equipment_ids").array(),
+
+  note: text("note"),
+
+  createdAt: timestamp("created_at")
+    .defaultNow()
+    .notNull(),
 });

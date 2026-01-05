@@ -25,8 +25,13 @@ import cors from "cors";
 import cookieParser from "cookie-parser";
 import { authRouter } from "./routes/auth";
 import { ticketRouter } from "./routes/tickets";
+import { equipmentRouter } from "./routes/equipments";
+import userRouter from "./routes/user.routes";
+
+
 
 const app = express();
+
 
 app.use(
   cors({
@@ -39,6 +44,12 @@ app.use(express.json());
 
 app.use("/api/auth", authRouter);
 app.use("/api/tickets", ticketRouter);
+app.use("/api/users", userRouter);
+// src/app.ts or server.ts
+
+
+app.use("/api/equipments", equipmentRouter);
+
 
 // Health check
 app.get("/api/health", (req, res) => {

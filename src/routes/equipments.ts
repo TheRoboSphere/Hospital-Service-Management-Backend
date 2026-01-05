@@ -1,0 +1,163 @@
+import { Router } from "express";
+import { db, equipments } from "../db";
+import { requireAuth, requireAdmin } from "../middleware/auth";
+import { eq, desc } from "drizzle-orm";
+
+export const equipmentRouter = Router();
+equipmentRouter.get("/", requireAuth, async (req, res) => {
+  try {
+    const user = req.user!;
+    const queryUnitId = req.query.unitId
+      ? Number(req.query.unitId)
+      : null;
+
+    let rows;
+
+    // ADMIN → unitId MUST come from params/query
+    if (user.role === "admin") {
+      if (!queryUnitId || isNaN(queryUnitId)) {
+        return res.json({ equipments: [] });
+      }
+
+      rows = await db
+        .select()
+        .from(equipments)
+        .where(eq(equipments.unitId, queryUnitId))
+        .orderBy(desc(equipments.createdAt));
+    }
+
+    // EMPLOYEE → use assigned unit
+    else {
+      if (!user.unitId) {
+        return res.json({ equipments: [] });
+      }
+
+      rows = await db
+        .select()
+        .from(equipments)
+        .where(eq(equipments.unitId, user.unitId))
+        .orderBy(desc(equipments.createdAt));
+    }
+
+    return res.json({ equipments: rows });
+  } catch (e) {
+    console.error("FETCH EQUIPMENT ERROR:", e);
+    return res.status(500).json({ message: "Server error" });
+  }
+});
+
+
+equipmentRouter.post("/", requireAuth, requireAdmin, async (req, res) => {
+  try {
+    const {
+      name,
+      category,
+      manufacturer,
+      model,
+      serialNumber,
+      location,
+      status,
+      nextMaintenance,
+      purchaseDate,
+      warrantyExpiry,
+      lastMaintenance,
+      cost,
+      unitId,
+    } = req.body;
+
+    if (!name || !category || !manufacturer || !model || !serialNumber)
+      return res.status(400).json({ message: "Missing required fields" });
+
+    if (!unitId)
+      return res.status(400).json({ message: "unitId is required" });
+
+    const [created] = await db
+      .insert(equipments)
+      .values({
+        name,
+        category,
+        manufacturer,
+        model,
+        serialNumber,
+        location,
+        status,
+        nextMaintenance: new Date(nextMaintenance),
+        purchaseDate: purchaseDate ? new Date(purchaseDate) : null,
+        warrantyExpiry: warrantyExpiry ? new Date(warrantyExpiry) : null,
+        lastMaintenance: lastMaintenance ? new Date(lastMaintenance) : null,
+        cost,
+        unitId: Number(unitId),
+      })
+      .returning();
+
+    return res.status(201).json({ equipment: created });
+  } catch (e) {
+    console.error("ADD EQUIPMENT ERROR:", e);
+    return res.status(500).json({ message: "Server error" });
+  }
+});
+
+
+equipmentRouter.put("/:id", requireAuth, requireAdmin, async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+
+    const {
+      name,
+      category,
+      manufacturer,
+      model,
+      serialNumber,
+      location,
+      status,
+      nextMaintenance,
+      purchaseDate,
+      warrantyExpiry ,
+      lastMaintenance,
+      cost,
+    } = req.body;
+
+    const [updated] = await db
+      .update(equipments)
+      .set({
+        name,
+        category,
+        manufacturer,
+        model,
+        serialNumber,
+        location,
+        status,
+        nextMaintenance: new Date(nextMaintenance),
+        cost,
+        purchaseDate: purchaseDate ? new Date(purchaseDate) : null,
+        warrantyExpiry: warrantyExpiry ? new Date(warrantyExpiry) : null,
+        lastMaintenance: lastMaintenance ? new Date(lastMaintenance) : null,
+        updatedAt: new Date(),
+      })
+      .where(eq(equipments.id, id))
+      .returning();
+
+    if (!updated) {
+      return res.status(404).json({ message: "Equipment not found" });
+    }
+
+    return res.json({ equipment: updated });
+  } catch (e) {
+    console.error("UPDATE EQUIPMENT ERROR:", e);
+    return res.status(500).json({ message: "Server error" });
+  }
+});
+
+
+equipmentRouter.delete("/:id", requireAuth, requireAdmin, async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+
+    await db.delete(equipments).where(eq(equipments.id, id));
+
+    return res.json({ success: true });
+  } catch (e) {
+    console.error("DELETE EQUIPMENT ERROR:", e);
+    return res.status(500).json({ message: "Server error" });
+  }
+});

@@ -1,8 +1,10 @@
 // src/routes/tickets.ts
 import { Router } from "express";
 import { requireAuth, requireAdmin } from "../middleware/auth";
-import { db, tickets, units, users } from "../db";
+import { db, ticketAssignments, tickets, units, users } from "../db";
 import { eq, and,sql,desc } from "drizzle-orm";
+import { sendAssignmentEmail } from "../utils/email";
+import { sendAssignmentSMS } from "../utils/sms";
 
 export const ticketRouter = Router();
 
@@ -90,139 +92,10 @@ ticketRouter.post("/", requireAuth, async (req, res) => {
 
 
 
-/* ------------------ DASHBOARD COUNTS ------------------ */
-// ticketRouter.get("/count", requireAuth, async (req, res) => {
-//   try {
-//     const user = req.user!;
-
-//     const baseWhere =
-//       user.role === "admin"
-//         ? undefined
-//         : user.unitId
-//         ? eq(tickets.unitId, user.unitId)
-//         : undefined;
-
-//     if (!baseWhere && user.role !== "admin") {
-//       return res.json({
-//         total: 0,
-//         pending: 0,
-//         inProgress: 0,
-//         resolved: 0,
-//       });
-//     }
-
-//     const [total] = await db
-//       .select({ count: sql<number>`count(*)` })
-//       .from(tickets)
-//       .where(baseWhere);
-
-//     const [pending] = await db
-//       .select({ count: sql<number>`count(*)` })
-//       .from(tickets)
-//       .where(
-//         baseWhere
-//           ? and(baseWhere, eq(tickets.status, "pending"))
-//           : eq(tickets.status, "pending")
-//       );
-
-//     const [inProgress] = await db
-//       .select({ count: sql<number>`count(*)` })
-//       .from(tickets)
-//       .where(
-//         baseWhere
-//           ? and(baseWhere, eq(tickets.status, "in_progress"))
-//           : eq(tickets.status, "in_progress")
-//       );
-
-//     const [resolved] = await db
-//       .select({ count: sql<number>`count(*)` })
-//       .from(tickets)
-//       .where(
-//         baseWhere
-//           ? and(baseWhere, eq(tickets.status, "resolved"))
-//           : eq(tickets.status, "resolved")
-//       );
-
-//     return res.json({
-//       total: Number(total.count),
-//       pending: Number(pending.count),
-//       inProgress: Number(inProgress.count),
-//       resolved: Number(resolved.count),
-//     });
-//   } catch (e) {
-//     console.error("COUNT ERROR:", e);
-//     return res.status(500).json({ message: "Server error" });
-//   }
-// });
 
 /* ------------------ GET ALL TICKETS ------------------ */
 
-// ticketRouter.get("/", requireAuth, async (req, res) => {
-//   try {
-//     const user = req.user!;
-//     // const queryUnitId = req.query.unitId
-//     //   ? Number(req.query.unitId)
-//     //   : null;
-//    // const  unitId  = req.query;
-   
-// const unitId = Number(user.unitId);
-//     let rows;
-//     if (!user.unitId || isNaN(Number(user.unitId))) {
-//   return res.json({ tickets: [] });
-// }
 
-//     if (user.role !== "admin" && user.unitId !== null && Number.isNaN(Number(user.unitId))) {
-    
-//       rows = await db
-//         .select({
-//           id: tickets.id,
-//           title: tickets.title,
-//           description: tickets.description,
-//           category: tickets.category,
-//           priority: tickets.priority,
-//           status: tickets.status,
-//           department: tickets.department,
-//           unitId: tickets.unitId,
-//           createdAt: tickets.createdAt,
-
-//           // 👇 THIS IS THE KEY
-//           createdBy: users.name,
-//           assignedTo: tickets.assignedToName,
-//         })
-//         .from(tickets)
-//         .leftJoin(users, eq(tickets.createdById, users.id))
-//         .where(eq(tickets.unitId, Number(unitId)))
-//         .orderBy(desc(tickets.createdAt));
-//     } else {
-//       if (!user.unitId) return res.json({ tickets: [] });
-
-//       rows = await db
-//         .select({
-//           id: tickets.id,
-//           title: tickets.title,
-//           description: tickets.description,
-//           category: tickets.category,
-//           priority: tickets.priority,
-//           status: tickets.status,
-//           department: tickets.department,
-//           unitId: tickets.unitId,
-//           createdAt: tickets.createdAt,
-
-//           createdBy: users.name,
-//           assignedTo: tickets.assignedToName,
-//         })
-//         .from(tickets)
-//         .leftJoin(users, eq(tickets.createdById, users.id))
-//         .where(eq(tickets.unitId, user.unitId))
-//         .orderBy(desc(tickets.createdAt));
-//     }
-
-//     return res.json({ tickets: rows });
-//   } catch (e) {
-//     console.error("FETCH ERROR:", e);
-//     return res.status(500).json({ message: "Server error" });
-//   }
-// });
 ticketRouter.get(
   "/unit/:unitId",
   requireAuth,
@@ -283,77 +156,7 @@ ticketRouter.get("/pending", requireAuth, requireAdmin, async (req, res) => {
 });
 
 // ------------------ UPDATE TICKET ------------------
-// ticketRouter.patch("/:id", requireAuth, async (req, res) => {
-//   try {
-//     const ticketId = Number(req.params.id);
-//     const user = req.user!;
 
-//     const {
-//       status,
-//       priority,
-//       category,
-//       assignedTo,
-//     } = req.body as {
-//       status?: string;
-//       priority?: string;
-//       category?: string;
-//       assignedTo?: string | null;
-//     };
-
-//     // 🔒 Fetch ticket
-//     const existing = await db
-//       .select()
-//       .from(tickets)
-//       .where(eq(tickets.id, ticketId));
-
-//     if (!existing[0]) {
-//       return res.status(404).json({ message: "Ticket not found" });
-//     }
-
-//     const ticket = existing[0];
-
-//     // 🔐 UNIT ACCESS CHECK
-//     if (user.role !== "admin" && user.unitId !== ticket.unitId) {
-//       return res.status(403).json({ message: "Unauthorized" });
-//     }
-
-//     let assignedToId: number | null = null;
-//     let assignedToName: string | null = null;
-
-//     if (assignedTo && assignedTo.trim() !== "") {
-//       const foundUser = await db
-//         .select()
-//         .from(users)
-//         .where(eq(users.name, assignedTo));
-
-//       if (foundUser[0]) {
-//         assignedToId = foundUser[0].id;
-//         assignedToName = null;
-//       } else {
-//         assignedToName = assignedTo;
-//       }
-//     }
-
-//     const updated = await db
-//       .update(tickets)
-//       .set({
-//         status: status ?? ticket.status,
-//         priority: priority ?? ticket.priority,
-//         category: category ?? ticket.category,
-//         assignedToId,
-//         assignedToName,
-//         updatedAt: new Date(),
-//       })
-//       .where(eq(tickets.id, ticketId))
-//       .returning();
-
-//     return res.json({ ticket: updated[0] });
-
-//   } catch (e) {
-//     console.error("UPDATE TICKET ERROR:", e);
-//     return res.status(500).json({ message: "Server error" });
-//   }
-// });
 ticketRouter.patch("/:id", requireAuth, async (req, res) => {
   try {
     const ticketId = Number(req.params.id);
@@ -459,3 +262,219 @@ ticketRouter.patch(
     }
   }
 );
+// ticketRouter.post("/:id/assign", requireAuth, async (req, res) => {
+//   try {
+//     const user = req.user;
+//     if (!user) {
+//   return res.status(401).json({ message: "Unauthorized" });
+// }
+//     // 🔐 Admin-only
+//     if (user.role !== "admin") {
+//       return res.status(403).json({ message: "Forbidden" });
+//     }
+
+//     const ticketId = Number(req.params.id);
+//     const { assignedToId, requiredEquipmentIds, equipmentNote } = req.body;
+
+//     // get employee
+//     const employee = await db
+//       .select()
+//       .from(users)
+//       .where(eq(users.id, assignedToId))
+//       .limit(1);
+
+//     if (!employee.length) {
+//       return res.status(404).json({ message: "Employee not found" });
+//     }
+
+//     // update ticket
+//     const [updated] = await db
+//       .update(tickets)
+//       .set({
+//         assignedToId,
+//         assignedToName: employee[0].name,
+//         status: "In Progress",
+//         updatedAt: new Date(),
+//       })
+//       .where(eq(tickets.id, ticketId))
+//       .returning();
+
+//     // 🧾 optional: save assignment metadata
+  
+//     await db.insert(ticketAssignments).values({
+//   ticketId,
+//   assignedToId,
+//   assignedById: user.id,
+//   equipmentIds: requiredEquipmentIds,
+//   note: equipmentNote,
+// });
+
+
+//     // 🔔 NOTIFICATIONS
+//     await sendAssignmentEmail({
+//   to: employee[0].email,
+//   employeeName: employee[0].name,
+//   ticketId: updated.id,
+//   note: updated.assignmentNote});
+//     await sendAssignmentSMS({
+//   phone: employee[0].phoneNumber,
+//   employeeName: employee[0].name,
+//   ticketId: updated.id,
+// });
+
+//     res.json({ ticket: updated });
+//   } catch (e) {
+//     console.error("ASSIGN ERROR:", e);
+//     res.status(500).json({ message: "Server error" });
+//   }
+// });
+// ticketRouter.post("/:id/assign", requireAuth, async (req, res) => {
+//   try {
+//     const user = req.user;
+//     if (!user) {
+//       return res.status(401).json({ message: "Unauthorized" });
+//     }
+
+//     // 🔐 Admin-only
+//     if (user.role !== "admin") {
+//       return res.status(403).json({ message: "Forbidden" });
+//     }
+
+//     const ticketId = Number(req.params.id);
+//     const { assignedToId, requiredEquipmentIds, equipmentNote } = req.body;
+
+//     // 👤 get employee
+//     const employee = await db
+//       .select()
+//       .from(users)
+//       .where(eq(users.id, assignedToId))
+//       .limit(1);
+
+//     if (!employee.length) {
+//       return res.status(404).json({ message: "Employee not found" });
+//     }
+
+//     // 🎫 update ticket
+//     const [updated] = await db
+//       .update(tickets)
+//       .set({
+//         assignedToId,
+//         assignedToName: employee[0].name,
+//         status: "In Progress",
+//         updatedAt: new Date(),
+//       })
+//       .where(eq(tickets.id, ticketId))
+//       .returning();
+
+//     // 🧾 save assignment metadata
+//     await db.insert(ticketAssignments).values({
+//       ticketId,
+//       assignedToId,
+//       assignedById: user.id,
+//       equipmentIds: requiredEquipmentIds ?? [],
+//       note: equipmentNote ?? null,
+//     });
+
+//     // 📧 EMAIL
+//     await sendAssignmentEmail({
+//       to: employee[0].email,
+//       employeeName: employee[0].name,
+//       ticketId: updated.id,
+//       note: equipmentNote,
+//     });
+
+//     // 📱 SMS
+//     if (employee[0].phoneNumber) {
+//       await sendAssignmentSMS({
+//         phone: employee[0].phoneNumber,
+//         ticketId: updated.id,
+//       });
+//     }
+
+//     res.json({ ticket: updated });
+//   } catch (e) {
+//     console.error("ASSIGN ERROR:", e);
+//     res.status(500).json({ message: "Server error" });
+//   }
+// });
+ticketRouter.post("/:id/assign", requireAuth, async (req, res) => {
+  try {
+    if (!req.user) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+
+    if (req.user.role !== "admin") {
+      return res.status(403).json({ message: "Forbidden" });
+    }
+
+    const ticketId = Number(req.params.id);
+    const {
+      assignedToId,
+      requiredEquipmentIds = [],
+      equipmentNote,
+      deadline,
+      extraCost = 0,
+    } = req.body;
+
+    if (!assignedToId || !deadline) {
+      return res.status(400).json({
+        message: "assignedToId and deadline are required",
+      });
+    }
+
+    // ✅ get employee
+    const employee = await db
+      .select()
+      .from(users)
+      .where(eq(users.id, assignedToId))
+      .limit(1);
+
+    if (!employee.length) {
+      return res.status(404).json({ message: "Employee not found" });
+    }
+
+    // ✅ update ticket
+    const [updated] = await db
+      .update(tickets)
+      .set({
+        assignedToId,
+        assignedToName: employee[0].name,
+        status: "In Progress",
+        updatedAt: new Date(),
+      })
+      .where(eq(tickets.id, ticketId))
+      .returning();
+
+    if (!updated) {
+      return res.status(404).json({ message: "Ticket not found" });
+    }
+
+    // 🔔 notifications (NON-BLOCKING)
+    try {
+      await sendAssignmentEmail({
+        to: employee[0].email,
+        employeeName: employee[0].name,
+        ticketId: updated.id,
+        note: equipmentNote,
+      });
+    } catch (e) {
+      console.error("EMAIL FAILED:", e);
+    }
+
+    try {
+      if (employee[0].phoneNumber) {
+        await sendAssignmentSMS({
+          phone: employee[0].phoneNumber,
+          ticketId: updated.id,
+        });
+      }
+    } catch (e) {
+      console.error("SMS FAILED:", e);
+    }
+
+    return res.json({ ticket: updated });
+  } catch (err) {
+    console.error("ASSIGN ROUTE ERROR:", err);
+    return res.status(500).json({ message: "Server error" });
+  }
+});
