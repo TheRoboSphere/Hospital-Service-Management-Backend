@@ -20,13 +20,12 @@ app.use(
   cors({
    origin: "https://hospital-mangement-system-mu.vercel.app",
     credentials: true,
-    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "Authorization"],
+   
   })
 );
-app.use(cookieParser());
-app.use(express.json());
 
+app.use(express.json());
+app.use(cookieParser());
 
 
 app.use("/api/auth", authRouter);
