@@ -1,6 +1,7 @@
 
 
 // src/db/schema.ts
+import { boolean } from "drizzle-orm/pg-core";
 import {
   pgTable,
   serial,
@@ -140,4 +141,24 @@ export const ticketAssignments = pgTable("ticket_assignments", {
   createdAt: timestamp("created_at")
     .defaultNow()
     .notNull(),
+});
+
+export const systemSettings = pgTable("system_settings", {
+  id: serial("id").primaryKey(),
+  hospitalName: text("hospital_name").notNull(),
+  contactEmail: text("contact_email"),
+  contactPhone: text("contact_phone"),
+  currency: text("currency").default("INR"),
+  dateFormat: text("date_format").default("DD/MM/YYYY"),
+  maintenanceAlertDays: integer("maintenance_alert_days").default(30),
+});
+export const notificationSettings = pgTable("notification_settings", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id")
+    .references(() => users.id)
+    .notNull(),
+
+  assignmentEmail: boolean("assignment_email").default(true),
+  assignmentSMS: boolean("assignment_sms").default(false),
+  deadlineReminder: boolean("deadline_reminder").default(true),
 });

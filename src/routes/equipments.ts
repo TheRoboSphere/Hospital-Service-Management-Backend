@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { db, equipments } from "../db";
 import { requireAuth, requireAdmin } from "../middleware/auth";
-import { eq, desc } from "drizzle-orm";
+import { eq, desc ,sql} from "drizzle-orm";
 
 export const equipmentRouter = Router();
 equipmentRouter.get("/", requireAuth, async (req, res) => {
@@ -160,4 +160,46 @@ equipmentRouter.delete("/:id", requireAuth, requireAdmin, async (req, res) => {
     console.error("DELETE EQUIPMENT ERROR:", e);
     return res.status(500).json({ message: "Server error" });
   }
+});
+
+
+
+
+
+/* ============================
+   EQUIPMENT STATS
+============================ */
+equipmentRouter.get("/stats", requireAuth, async (req, res) => {
+  const unitId = Number(req.query.unitId);
+  if (!unitId) {
+    return res.status(400).json({ message: "unitId required" });
+  }
+
+  
+  const result = await db.execute(sql`
+  SELECT
+    COUNT(*)::int AS total,
+    COUNT(*) FILTER (WHERE status = 'Active')::int AS active,
+    COUNT(*) FILTER (WHERE status = 'Maintenance')::int AS maintenance,
+    COUNT(*) FILTER (WHERE status = 'Out of Order')::int AS out_of_order,
+    COALESCE(SUM(cost),0)::int AS total_value
+  FROM equipments
+  WHERE unit_id = ${unitId}
+`);
+
+const stats = result.rows[0] as {
+  total: number;
+  active: number;
+  maintenance: number;
+  out_of_order: number;
+  total_value: number;
+};
+
+  res.json({
+    total: stats.total,
+    active: stats.active,
+    maintenance: stats.maintenance,
+    outOfOrder: stats.out_of_order,
+    totalValue: stats.total_value,
+  });
 });

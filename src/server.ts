@@ -1,21 +1,4 @@
-// import express from "express";
-// import userRoutes from "./routes/user.routes";
-// import dotenv from "dotenv";
 
-// dotenv.config();
-
-// const app = express();
-// app.use(express.json());
-
-// // Routes
-// app.use("/test", userRoutes);
-
-// app.get("/", (_req, res) => {
-//   res.send("Drizzle + Express API Running 🚀");
-// });
-
-// const PORT = 5000;
-// app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
 
 
 // src/index.ts
@@ -27,15 +10,16 @@ import { authRouter } from "./routes/auth";
 import { ticketRouter } from "./routes/tickets";
 import { equipmentRouter } from "./routes/equipments";
 import userRouter from "./routes/user.routes";
-
+import settingsRouter from "./routes/settings";
+import dashboardRouter from "./routes/Dashboard";
 
 
 const app = express();
 
-
 app.use(
   cors({
-    origin: "http://localhost:5173", // your React URL
+    origin: process.env.FRONTEND_URL || "http://localhost:5173",
+     // your React URL
     credentials: true,
   })
 );
@@ -45,6 +29,8 @@ app.use(express.json());
 app.use("/api/auth", authRouter);
 app.use("/api/tickets", ticketRouter);
 app.use("/api/users", userRouter);
+app.use("/api/settings", settingsRouter);
+app.use("/api/dashboard", dashboardRouter);
 // src/app.ts or server.ts
 
 

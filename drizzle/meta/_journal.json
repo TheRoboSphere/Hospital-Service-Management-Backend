@@ -57,6 +57,20 @@
       "when": 1767614621515,
       "tag": "0007_tranquil_silver_samurai",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1767700597858,
+      "tag": "0008_chemical_nightmare",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1767702403525,
+      "tag": "0009_mature_warbird",
+      "breakpoints": true
     }
   ]
 }
