@@ -18,7 +18,7 @@ const app = express();
 
 app.use(
   cors({
-   origin: "https://hospital-mangement-system-mu.vercel.app",
+   origin:"https://hospital-mangement-system-mu.vercel.app/" ,
     credentials: true,
    
   })

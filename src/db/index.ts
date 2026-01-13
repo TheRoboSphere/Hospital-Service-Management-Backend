@@ -1,7 +1,3 @@
-// import { drizzle } from 'drizzle-orm/neon-http';
-// import 'dotenv/config';
-
-// const db = drizzle(process.env.DATABASE_URL);
 
 
 import { drizzle } from "drizzle-orm/node-postgres";

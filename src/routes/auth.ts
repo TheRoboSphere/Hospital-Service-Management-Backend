@@ -49,47 +49,152 @@ authRouter.post("/seed", async (req, res) => {
 });
 
 // REGISTER NEW USER (ADMIN ONLY)
+// authRouter.post("/register", async (req, res) => {
+//   try {
+//     const { name, email, password, phone, unitId, department,adminCode,Role } = req.body;
+
+//     // Validate
+//     if (!name || !email || !password || !phone) {
+//       return res.status(400).json({ message: "Missing required fields" });
+//     }
+//     type UserRole = "admin" | "employee" | "manager";
+
+//     let role: UserRole = "employee";
+    
+//     if (adminCode) {
+//       const isAdmin = await isValidAdminCode(adminCode);
+//       if (!isAdmin) {
+//         return res.status(401).json({ message: "Invalid admin code" });
+//       }
+//       role = "admin";
+//     }
+
+//     // Validate role
+//     if (!["admin", "employee"].includes(role)) {
+//       return res
+//         .status(400)
+//         .json({ message: "Role must be either 'admin' or 'employee'" });
+//     }
+
+//     // Employee MUST have a unit
+//     if (role === "employee" && !unitId) {
+//       return res.status(400).json({
+//         message: "Employee must be assigned to a unit",
+//       });
+//     }
+
+//     // Check if email already exists
+//     const existing = await findUserByEmail(email);
+//     if (existing) {
+//       return res.status(400).json({ message: "User already exists" });
+//     }
+
+//     // Hash password
+//     const passwordHash = await hashPassword(password);
+
+//     const inserted = await db
+//       .insert(users)
+//       .values({
+//         name,
+//         email,
+//         passwordHash,
+//         phoneNumber: phone,
+//         role,
+//         unitId: role === "employee" ? unitId : null,
+//       })
+//       .returning();
+
+//     const createdUser = inserted[0];
+
+//     return res.status(201).json({
+//       message: "User registered successfully",
+//       user: {
+//         id: createdUser.id,
+//         name: createdUser.name,
+//         email: createdUser.email,
+//         role: createdUser.role,
+//         unitId: createdUser.unitId,
+//         phoneNumber: createdUser.phoneNumber,
+//       },
+//     });
+//   } catch (error) {
+//     console.error("Register Error:", error);
+//     return res.status(500).json({ message: "Server error" });
+//   }
+// });
+
 authRouter.post("/register", async (req, res) => {
   try {
-    const { name, email, password, phone, unitId, adminCode } = req.body;
+    const {
+      name,
+      email,
+      password,
+      phone,
+      unitId,
+      role,        // 👈 from frontend
+      department,  // 👈 from frontend
+      adminCode,
+    } = req.body;
 
     // Validate
-    if (!name || !email || !password || !phone) {
-      return res.status(400).json({ message: "Missing required fields" });
+    if (!name || !email || !password || !phone || !role||!department) {
+      return res.status(400).json({
+        message: "Missing required fields",
+      });
     }
-    type UserRole = "admin" | "employee";
 
-    let role: UserRole = "employee";
-    
-    if (adminCode) {
-      const isAdmin = await isValidAdminCode(adminCode);
-      if (!isAdmin) {
-        return res.status(401).json({ message: "Invalid admin code" });
+    type UserRole = "admin" | "employee" | "manager";
+
+    if (!["admin", "employee", "manager"].includes(role)) {
+      return res.status(400).json({
+        message: "Invalid role",
+      });
+    }
+
+    /* ============================
+       ADMIN / MANAGER VALIDATION
+    ============================= */
+
+    if (role === "admin" || role === "manager") {
+      if (!adminCode) {
+        return res.status(400).json({
+          message: "Admin code required",
+        });
       }
-      role = "admin";
+
+      const isValid = await isValidAdminCode(adminCode);
+      if (!isValid) {
+        return res.status(401).json({
+          message: "Invalid admin code",
+        });
+      }
     }
 
-    // Validate role
-    if (!["admin", "employee"].includes(role)) {
-      return res
-        .status(400)
-        .json({ message: "Role must be either 'admin' or 'employee'" });
-    }
+    /* ============================
+       EMPLOYEE VALIDATION
+    ============================= */
 
-    // Employee MUST have a unit
     if (role === "employee" && !unitId) {
       return res.status(400).json({
         message: "Employee must be assigned to a unit",
       });
     }
 
-    // Check if email already exists
+    /* ============================
+       EMAIL CHECK
+    ============================= */
+
     const existing = await findUserByEmail(email);
     if (existing) {
-      return res.status(400).json({ message: "User already exists" });
+      return res.status(400).json({
+        message: "User already exists",
+      });
     }
 
-    // Hash password
+    /* ============================
+       CREATE USER
+    ============================= */
+
     const passwordHash = await hashPassword(password);
 
     const inserted = await db
@@ -100,7 +205,8 @@ authRouter.post("/register", async (req, res) => {
         passwordHash,
         phoneNumber: phone,
         role,
-        unitId: role === "employee" ? unitId : null,
+        department: department || null, // 👈 save department
+        unitId: role === "employee" || role === "manager" ? unitId : null,
       })
       .returning();
 
@@ -114,15 +220,17 @@ authRouter.post("/register", async (req, res) => {
         email: createdUser.email,
         role: createdUser.role,
         unitId: createdUser.unitId,
+        department: createdUser.department,
         phoneNumber: createdUser.phoneNumber,
       },
     });
   } catch (error) {
     console.error("Register Error:", error);
-    return res.status(500).json({ message: "Server error" });
+    return res.status(500).json({
+      message: "Server error",
+    });
   }
 });
-
 
 // Login
    
@@ -170,7 +278,7 @@ authRouter.post("/login", async (req, res) => {
     needsUnitSelection = true;
   }
 
-  if (user.role === "employee") {
+  if (user.role === "employee"||user.role==="manager") {
     // Employee MUST have a unit in DB
     if (!user.unitId) {
       return res.status(400).json({

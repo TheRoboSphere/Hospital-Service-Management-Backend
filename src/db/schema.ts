@@ -13,7 +13,7 @@ import {
 } from "drizzle-orm/pg-core";
 
 // Role enum
-export const roleEnum = pgEnum("role_enum", ["admin", "employee"]);
+export const roleEnum = pgEnum("role_enum", ["admin", "employee", "manager"]);
 
 
 export const ticketStatusEnum = pgEnum("ticket_status_enum", [
@@ -39,6 +39,7 @@ export const users = pgTable("users", {
   phoneNumber: varchar("phone_number", { length: 20 }),
   // For employees, which unit they belong to
   unitId: integer("unit_id").references(() => units.id),
+  department: varchar("department", { length: 100 }).notNull().default("General"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
@@ -94,30 +95,81 @@ export const tickets = pgTable("tickets", {
   category: varchar("category", { length: 100 }).notNull(),
   priority: varchar("priority", { length: 20 }).notNull(),
 
-  // NEW FIELDS FROM FRONTEND
   department: varchar("department", { length: 255 }).notNull(),
-     // name from frontend
 
   floor: varchar("floor", { length: 10 }),
   room: varchar("room", { length: 20 }),
   bed: varchar("bed", { length: 20 }),
+  comment: varchar("comment", { length: 500 }),
   status: ticketStatusEnum("status")
-        .notNull()
-        .default("Pending"),
+    .notNull()
+    .default("Pending"),
 
   unitId: integer("unit_id").references(() => units.id).notNull(),
+
   equipmentId: integer("equipment_id"),
+
   assignedToName: varchar("assigned_to_name", { length: 255 }),
+
   createdById: integer("created_by_id")
     .notNull()
     .references(() => users.id),
 
-
   assignedToId: integer("assigned_to_id").references(() => users.id),
+
+  /* ===========================
+     NEW FIELDS (WORKFLOW)
+  ============================ */
+
+  // manager assigned by admin
+  assignedManagerId: integer("assigned_manager_id")
+    .references(() => users.id),
+
+  // employee assigned by manager
+  assignedEmployeeId: integer("assigned_employee_id")
+    .references(() => users.id),
+
+  // employee work update
+  workNote: text("work_note"),
+
+  // equipment used during work
+  equipmentsUsed: integer("equipments_used").array(),
+
+  // manager verification
+  managerReviewNote: text("manager_review_note"),
+
+  // department verification
+  departmentReviewNote: text("department_review_note"),
+
+  // timestamps for tracking
+  startedAt: timestamp("started_at"),
+  completedAt: timestamp("completed_at"),
+  closedAt: timestamp("closed_at"),
 
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
+
+export const ticketLogs = pgTable("ticket_logs", {
+  id: serial("id").primaryKey(),
+
+  ticketId: integer("ticket_id")
+    .references(() => tickets.id)
+    .notNull(),
+
+  action: text("action").notNull(), // assigned, accepted, completed etc
+
+  message: text("message"),
+
+  doneById: integer("done_by_id")
+    .references(() => users.id)
+    .notNull(),
+
+  createdAt: timestamp("created_at")
+    .defaultNow()
+    .notNull(),
+});
+
 export const ticketAssignments = pgTable("ticket_assignments", {
   id: serial("id").primaryKey(),
 
@@ -131,17 +183,22 @@ export const ticketAssignments = pgTable("ticket_assignments", {
 
   assignedById: integer("assigned_by_id")
     .notNull()
-    .references(() => users.id), // admin
+    .references(() => users.id),
 
-  // optional equipment list (array of equipment ids)
   equipmentIds: integer("equipment_ids").array(),
 
   note: text("note"),
+
+  /* NEW */
+  role: text("role"), // admin → manager → employee
 
   createdAt: timestamp("created_at")
     .defaultNow()
     .notNull(),
 });
+
+
+
 
 export const systemSettings = pgTable("system_settings", {
   id: serial("id").primaryKey(),

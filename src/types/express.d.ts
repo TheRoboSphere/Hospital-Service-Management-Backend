@@ -19,10 +19,11 @@ declare global {
     interface Request {
       user?: {
         id: number;
-        role: "admin" | "employee";
+        role: "admin" | "employee" | "manager";
         unitId: number | null;
         name: string;
         email: string;
+        department: string;
       };
     }
   }
