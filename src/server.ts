@@ -18,9 +18,11 @@ const app = express();
 
 app.use(
   cors({
-   origin:"https://hospital-mangement-system-mu.vercel.app/" ,
+    origin: [
+      "https://hospital-mangement-system-mu.vercel.app",
+      "http://localhost:5173"
+    ],
     credentials: true,
-   
   })
 );
 
@@ -28,14 +30,14 @@ app.use(express.json());
 app.use(cookieParser());
 
 
+import { unitRouter } from "./routes/units";
+
 app.use("/api/auth", authRouter);
 app.use("/api/tickets", ticketRouter);
 app.use("/api/users", userRouter);
 app.use("/api/settings", settingsRouter);
 app.use("/api/dashboard", dashboardRouter);
-// src/app.ts or server.ts
-
-
+app.use("/api/units", unitRouter);
 app.use("/api/equipments", equipmentRouter);
 
 
