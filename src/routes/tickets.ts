@@ -2,7 +2,7 @@
 import { Router } from "express";
 import { requireAuth, requireAdmin } from "../middleware/auth";
 import { db, ticketAssignments, tickets, units, users } from "../db";
-import { eq, and,sql,desc } from "drizzle-orm";
+import { eq, and, sql, desc } from "drizzle-orm";
 import { sendAssignmentEmail } from "../utils/email";
 import { sendAssignmentSMS } from "../utils/sms";
 
@@ -30,7 +30,7 @@ ticketRouter.post("/", requireAuth, async (req, res) => {
     if (!title) return res.status(400).json({ message: "Title is required" });
     if (!category) return res.status(400).json({ message: "Category is required" });
     if (!description) return res.status(400).json({ message: "Description is required" });
-   
+
     if (!department) return res.status(400).json({ message: "Department is required" });
 
     const user = req.user!;
@@ -51,7 +51,7 @@ ticketRouter.post("/", requireAuth, async (req, res) => {
 
       finalUnitId = Number(unitId);
     }
-    
+
     const normalizedPriority = priority?.toLowerCase();
     const finalPriority =
       normalizedPriority === "critical" ? "high" : normalizedPriority || "medium";
@@ -66,14 +66,14 @@ ticketRouter.post("/", requireAuth, async (req, res) => {
         priority: finalPriority,
         department,
         // system-controlled
-        
+
         floor: Floor || null,
         room: Room || null,
         bed: Bed || null,
         status: "Pending",
 
         unitId: finalUnitId,
-        equipmentId:  null,
+        equipmentId: null,
 
         createdById: user.id,
         assignedToName: null,
@@ -126,6 +126,14 @@ ticketRouter.get(
           createdAt: tickets.createdAt,
           createdBy: users.name,
           assignedTo: tickets.assignedToName,
+          assignedToId: tickets.assignedToId,
+          assignedToDepartment: sql<string | null>`
+            CASE 
+              WHEN ${tickets.assignedToId} IS NOT NULL 
+              THEN (SELECT department FROM users WHERE id = ${tickets.assignedToId})
+              ELSE NULL 
+            END
+          `,
         })
         .from(tickets)
         .leftJoin(users, eq(tickets.createdById, users.id))
@@ -300,7 +308,7 @@ ticketRouter.patch(
 //       .returning();
 
 //     // 🧾 optional: save assignment metadata
-  
+
 //     await db.insert(ticketAssignments).values({
 //   ticketId,
 //   assignedToId,
@@ -868,9 +876,9 @@ ticketRouter.patch(
   }
 );
 // GET ALL (ADMIN)
-ticketRouter.get("/all", requireAuth, requireAdmin, async (req,res)=>{
- const rows = await db.select().from(tickets);
- res.json({tickets: rows});
+ticketRouter.get("/all", requireAuth, requireAdmin, async (req, res) => {
+  const rows = await db.select().from(tickets);
+  res.json({ tickets: rows });
 })
 // ADMIN → tickets he created
 ticketRouter.get("/admin/my", requireAuth, async (req, res) => {
