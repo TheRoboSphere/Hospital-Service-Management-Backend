@@ -21,6 +21,7 @@ app.use(
     origin: [
       "https://hospital-mangement-system-mu.vercel.app",
       "http://localhost:5173",
+      "http://localhost:4173",
       "https://hoserve.vercel.app",
       process.env.FRONTEND_URL
     ].filter(Boolean) as string[],
