@@ -21,12 +21,13 @@ export const ticketStatusEnum = pgEnum("ticket_status_enum", [
   "In Progress",
   "Pending",   // <-- ADD THIS
   "Resolved",
+  "Verified",
   "Closed"
 ]);
 
 
 // src/db/schema/equipments.ts
-import {  numeric } from "drizzle-orm/pg-core";
+import { numeric } from "drizzle-orm/pg-core";
 //import { units } from "./units";
 
 
