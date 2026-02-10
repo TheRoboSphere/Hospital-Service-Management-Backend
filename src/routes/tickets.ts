@@ -312,23 +312,14 @@ ticketRouter.post("/:id/assign", requireAuth, async (req, res) => {
     }
 
     // ✅ update ticket
-    const updateData: any = {
-      assignedToId,
-      assignedToName: employee[0].name,
-      status: "In Progress",
-      deadline: deadline ? new Date(deadline) : null,
-      extraCost,
-      updatedAt: new Date(),
-    };
-
-    // If manager is assigning, persist their ID so they keep visibility
-    if (req.user.role === "manager" && req.user.id) {
-      updateData.assignedManagerId = Number(req.user.id);
-    }
-
     const [updated] = await db
       .update(tickets)
-      .set(updateData)
+      .set({
+        assignedToId,
+        assignedToName: employee[0].name,
+        status: "In Progress",
+        updatedAt: new Date(),
+      })
       .where(eq(tickets.id, ticketId))
       .returning();
 
@@ -342,7 +333,7 @@ ticketRouter.post("/:id/assign", requireAuth, async (req, res) => {
     //     to: employee[0].email,
     //     employeeName: employee[0].name,
     //     ticketId: updated.id,
-    //     note: equipmentNote || "",
+    //     note: equipmentNote,
     //   });
     // } catch (e) {
     //   console.error("EMAIL FAILED:", e);
@@ -361,199 +352,309 @@ ticketRouter.post("/:id/assign", requireAuth, async (req, res) => {
 
     return res.json({ ticket: updated });
   } catch (err) {
-    console.error("ASSIGN ROUTE ERROR DETAILS:", err);
-    // @ts-ignore
-    const msg = err.message || String(err);
-    return res.status(500).json({ message: "Server error", error: msg });
+    console.error("ASSIGN ROUTE ERROR:", err);
+    return res.status(500).json({ message: "Server error" });
   }
 });
 
-//Employee: update comment on ticket (e.g. "Tried fixing, but part was broken")
-// Employee / Manager / Admin: Update ticket (comments, progress, minor edits)
-ticketRouter.patch("/:id/update", requireAuth, async (req, res) => {
-  try {
-    const user = req.user!;
-    const ticketId = Number(req.params.id);
+// ADMIN assign MANAGER
+// ticketRouter.post(
+//   "/:id/assign-manager",
+//   requireAuth,
+//   requireAdmin,
+//   async (req, res) => {
+//     try {
+//       const ticketId = Number(req.params.id);
+//       const { managerId } = req.body;
 
-    const { comment, status, priority, category } = req.body;
+//       if (!managerId) {
+//         return res.status(400).json({ message: "managerId required" });
+//       }
 
-    const [ticket] = await db
-      .select()
-      .from(tickets)
-      .where(eq(tickets.id, ticketId));
+//       const [manager] = await db
+//         .select()
+//         .from(users)
+//         .where(eq(users.id, managerId));
 
-    if (!ticket) {
-      return res.status(404).json({ message: "Ticket not found" });
-    }
+//       if (!manager) {
+//         return res.status(404).json({ message: "Manager not found" });
+//       }
 
-    // 🔐 RBAC
-    if (
-      user.role === "employee" &&
-      ticket.assignedToId !== user.id
-    ) {
-      return res.status(403).json({ message: "Not assigned to you" });
-    }
+//       const [updated] = await db
+//         .update(tickets)
+//         .set({
+//           assignedManagerId: managerId,
+//           status: "In Progress",
+//           updatedAt: new Date(),
+//         })
+//         .where(eq(tickets.id, ticketId))
+//         .returning();
 
-    if (
-      user.role === "manager" &&
-      ticket.unitId !== user.unitId
-    ) {
-      return res.status(403).json({ message: "Unauthorized" });
-    }
+//       return res.json({ ticket: updated });
+//     } catch (e) {
+//       console.error("ASSIGN MANAGER ERROR:", e);
+//       return res.status(500).json({ message: "Server error" });
+//     }
+//   }
+// );
+ticketRouter.post(
+  "/:id/assign-manager",
+  requireAuth,
+  requireAdmin,
+  async (req, res) => {
+    try {
+      const ticketId = Number(req.params.id);
+      const { managerId } = req.body;
 
-    // ✅ SAFE STATUS TRANSITIONS
-    const allowedStatusByRole: Record<string, string[]> = {
-      employee: ["In Progress"],
-      manager: ["Resolved"],
-      admin: ["Pending", "In Progress", "Resolved", "Verified", "Closed"],
-    };
-
-    let nextStatus = ticket.status;
-
-    if (status) {
-      if (!allowedStatusByRole[user.role]?.includes(status)) {
-        return res.status(400).json({ message: "Invalid status update" });
+      if (!managerId) {
+        return res.status(400).json({ message: "managerId required" });
       }
-      nextStatus = status;
-    }
 
-    const [updated] = await db
-      .update(tickets)
-      .set({
-        comment: comment ?? ticket.comment,
-        status: nextStatus,
-        priority: priority ?? ticket.priority,
-        category: category ?? ticket.category,
-        updatedAt: new Date(),
-      })
-      .where(eq(tickets.id, ticketId))
-      .returning();
+      const [manager] = await db
+        .select()
+        .from(users)
+        .where(eq(users.id, managerId));
 
-    return res.json({ ticket: updated });
+      if (!manager) {
+        return res.status(404).json({ message: "Manager not found" });
+      }
 
-  } catch (err) {
-    console.error("UPDATE ROUTE ERROR:", err);
-    return res.status(500).json({ message: "Server error" });
-  }
-});
+      const [updated] = await db
+        .update(tickets)
+        .set({
+          assignedManagerId: managerId,
+          status: "In Progress",
+          updatedAt: new Date(),
+        })
+        .where(eq(tickets.id, ticketId))
+        .returning();
 
-
-// Employee: Mark ticket as done
-ticketRouter.patch("/:id/mark-done", requireAuth, async (req, res) => {
-  try {
-    const user = req.user!;
-    const ticketId = Number(req.params.id);
-
-    // Get ticket
-    const [ticket] = await db
-      .select()
-      .from(tickets)
-      .where(eq(tickets.id, ticketId));
-
-    if (!ticket) {
-      return res.status(404).json({ message: "Ticket not found" });
-    }
-
-    // Verify employee owns this ticket
-    if (ticket.assignedToId !== user.id) {
-      return res.status(403).json({ message: "Not assigned to you" });
-    }
-
-    // Update status to Resolved
-    const [updated] = await db
-      .update(tickets)
-      .set({ status: "Resolved" })
-      .where(eq(tickets.id, ticketId))
-      .returning();
-
-    return res.json({ ticket: updated });
-  } catch (err) {
-    console.error("MARK-DONE ERROR:", err);
-    return res.status(500).json({ message: "Server error" });
-  }
-});
-
-// Manager: Verify completed work
-ticketRouter.patch("/:id/verify", requireAuth, async (req, res) => {
-  try {
-    const user = req.user!;
-    const ticketId = Number(req.params.id);
-
-    if (user.role !== "manager") {
-      return res.status(403).json({ message: "Manager only" });
-    }
-
-    const [ticket] = await db
-      .select()
-      .from(tickets)
-      .where(eq(tickets.id, ticketId));
-
-    if (!ticket) {
-      return res.status(404).json({ message: "Ticket not found" });
-    }
-
-    if (ticket.status !== "Resolved") {
-      return res.status(400).json({
-        message: "Ticket must be resolved first"
+      /* ✅ INSERT LOG */
+      await db.insert(ticketAssignments).values({
+        ticketId,
+        assignedToId: managerId,
+        assignedById: req.user!.id,
+        role: "manager",
       });
+
+      return res.json({ ticket: updated });
+    } catch (e) {
+      console.error("ASSIGN MANAGER ERROR:", e);
+      return res.status(500).json({ message: "Server error" });
     }
-
-    // Update status to Verified
-    const [updated] = await db
-      .update(tickets)
-      .set({ status: "Verified" })
-      .where(eq(tickets.id, ticketId))
-      .returning();
-
-    return res.json({ ticket: updated });
-  } catch (err) {
-    console.error("VERIFY ERROR:", err);
-    return res.status(500).json({ message: "Server error" });
   }
-});
+);
 
-// Admin: Close ticket
-ticketRouter.patch("/:id/close", requireAuth, async (req, res) => {
-  try {
-    const user = req.user!;
-    const ticketId = Number(req.params.id);
-
-    if (user.role !== "admin") {
-      return res.status(403).json({ message: "Admin only" });
-    }
-
-    const [ticket] = await db
-      .select()
-      .from(tickets)
-      .where(eq(tickets.id, ticketId));
-
-    if (!ticket) {
-      return res.status(404).json({ message: "Ticket not found" });
-    }
-
-    if (ticket.status !== "Verified") {
-      return res.status(400).json({
-        message: "Ticket must be verified by manager first"
-      });
-    }
-
-    // Update status to Closed
-    const [updated] = await db
-      .update(tickets)
-      .set({ status: "Closed" })
-      .where(eq(tickets.id, ticketId))
-      .returning();
-
-    return res.json({ ticket: updated });
-  } catch (err) {
-    console.error("CLOSE ERROR:", err);
-    return res.status(500).json({ message: "Server error" });
-  }
-});
-
-// Admin: Get tickets assigned to them OR verified tickets needing closure
+// Manager tickets
 ticketRouter.get(
-  "/admin/assigned",
+  "/manager/my",
+  requireAuth,
+  async (req, res) => {
+    try {
+      const user = req.user!;
+
+      const rows = await db
+        .select()
+        .from(tickets)
+        .where(eq(tickets.assignedManagerId, user.id))
+        .orderBy(desc(tickets.createdAt));
+
+      return res.json({ tickets: rows });
+    } catch (e) {
+      console.error("MANAGER FETCH ERROR:", e);
+      return res.status(500).json({ message: "Server error" });
+    }
+  }
+);
+// ticketRouter.post(
+//   "/:id/assign-employee",
+//   requireAuth,
+//   async (req, res) => {
+//     try {
+//       const user = req.user!;
+//       const ticketId = Number(req.params.id);
+//       const { employeeId } = req.body;
+
+//       // only manager
+//       const [ticket] = await db
+//         .select()
+//         .from(tickets)
+//         .where(eq(tickets.id, ticketId));
+
+//       if (ticket.assignedManagerId !== user.id) {
+//         return res.status(403).json({ message: "Not your ticket" });
+//       }
+
+//       const [emp] = await db
+//         .select()
+//         .from(users)
+//         .where(eq(users.id, employeeId));
+
+//       if (!emp) {
+//         return res.status(404).json({ message: "Employee not found" });
+//       }
+
+//       const [updated] = await db
+//         .update(tickets)
+//         .set({
+//           assignedEmployeeId: employeeId,
+//           status: "In Progress",
+//           updatedAt: new Date(),
+//         })
+//         .where(eq(tickets.id, ticketId))
+//         .returning();
+
+//       return res.json({ ticket: updated });
+//     } catch (e) {
+//       console.error("ASSIGN EMP ERROR:", e);
+//       return res.status(500).json({ message: "Server error" });
+//     }
+//   }
+// );
+ticketRouter.post(
+  "/:id/assign-employee",
+  requireAuth,
+  async (req, res) => {
+    try {
+      const user = req.user!;
+      const ticketId = Number(req.params.id);
+      const { employeeId } = req.body;
+
+      const [ticket] = await db
+        .select()
+        .from(tickets)
+        .where(eq(tickets.id, ticketId));
+
+      if (ticket.assignedManagerId !== user.id) {
+        return res.status(403).json({ message: "Not your ticket" });
+      }
+
+      const [emp] = await db
+        .select()
+        .from(users)
+        .where(eq(users.id, employeeId));
+
+      if (!emp) {
+        return res.status(404).json({ message: "Employee not found" });
+      }
+
+      const [updated] = await db
+        .update(tickets)
+        .set({
+          assignedEmployeeId: employeeId,
+          status: "In Progress",
+          updatedAt: new Date(),
+        })
+        .where(eq(tickets.id, ticketId))
+        .returning();
+
+      /* ✅ INSERT LOG */
+      await db.insert(ticketAssignments).values({
+        ticketId,
+        assignedToId: employeeId,
+        assignedById: user.id,
+        role: "employee",
+      });
+
+      return res.json({ ticket: updated });
+    } catch (e) {
+      console.error("ASSIGN EMP ERROR:", e);
+      return res.status(500).json({ message: "Server error" });
+    }
+  }
+);
+
+
+ticketRouter.get(
+  "/employee/my",
+  requireAuth,
+  async (req, res) => {
+    try {
+      const user = req.user!;
+
+      const rows = await db
+        .select()
+        .from(tickets)
+        .where(eq(tickets.assignedEmployeeId, user.id))
+        .orderBy(desc(tickets.createdAt));
+
+      return res.json({ tickets: rows });
+    } catch (e) {
+      console.error("EMP FETCH ERROR:", e);
+      return res.status(500).json({ message: "Server error" });
+    }
+  }
+);
+ticketRouter.patch(
+  "/:id/start",
+  requireAuth,
+  async (req, res) => {
+    try {
+      const ticketId = Number(req.params.id);
+      const user = req.user!;
+
+    const [ticket] = await db
+      .select()
+      .from(tickets)
+      .where(eq(tickets.id, ticketId));
+
+      if (ticket.assignedEmployeeId !== user.id) {
+        return res.status(403).json({ message: "Not your ticket" });
+      }
+
+      const [updated] = await db
+        .update(tickets)
+        .set({
+          status: "In Progress",
+          startedAt: new Date(),
+        })
+        .where(eq(tickets.id, ticketId))
+        .returning();
+
+      return res.json({ ticket: updated });
+    } catch (e) {
+      console.error("START ERROR:", e);
+      return res.status(500).json({ message: "Server error" });
+    }
+  }
+);
+ticketRouter.patch(
+  "/:id/work-update",
+  requireAuth,
+  async (req, res) => {
+    try {
+      const ticketId = Number(req.params.id);
+      const user = req.user!;
+      const { workNote, equipmentsUsed } = req.body;
+
+    const [ticket] = await db
+      .select()
+      .from(tickets)
+      .where(eq(tickets.id, ticketId));
+
+      if (ticket.assignedEmployeeId !== user.id) {
+        return res.status(403).json({ message: "Not your ticket" });
+      }
+
+      const [updated] = await db
+        .update(tickets)
+        .set({
+          workNote,
+          equipmentsUsed,
+          updatedAt: new Date(),
+        })
+        .where(eq(tickets.id, ticketId))
+        .returning();
+
+      return res.json({ ticket: updated });
+    } catch (e) {
+      console.error("WORK UPDATE ERROR:", e);
+      return res.status(500).json({ message: "Server error" });
+    }
+  }
+);
+ticketRouter.patch(
+  "/:id/complete",
   requireAuth,
   requireAdmin,
   async (req, res) => {
@@ -589,7 +690,8 @@ ticketRouter.get(
   "/manager/assigned",
   requireAuth,
   async (req, res) => {
-    try { 
+    try {
+      const ticketId = Number(req.params.id);
       const user = req.user!;
       if (user.role !== "manager") {
         return res.status(403).json({ message: "Manager only" });

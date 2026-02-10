@@ -15,20 +15,20 @@ import dashboardRouter from "./routes/Dashboard";
 
 
 const app = express();
-
-app.use(
-  cors({
-    origin: [
-      "https://hospital-mangement-system-mu.vercel.app",
-      "https://hospital-service-management.vercel.app",
-      "http://localhost:5173",
-    //  "http://localhost:4173",
-    //  "https://hoserve.vercel.app",
-      process.env.FRONTEND_URL
-    ].filter(Boolean) as string[],
-    credentials: true,
-  })
-);
+const allowedOrigins = [
+  "https://hospital-service-management.vercel.app",
+  "http://localhost:5173"
+];
+app.use(cors({
+  origin: (origin, callback) => {
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error("Not allowed by CORS"));
+    }
+  },
+  credentials: true
+}));
 
 app.use(express.json());
 app.use(cookieParser());
