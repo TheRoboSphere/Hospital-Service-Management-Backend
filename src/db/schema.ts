@@ -17,7 +17,7 @@ export const roleEnum = pgEnum("role_enum", ["admin", "employee", "manager"]);
 
 
 export const ticketStatusEnum = pgEnum("ticket_status_enum", [
-  "Open",
+  "Verified",  // <-- ADDED THIS
   "In Progress",
   "Pending",   // <-- ADD THIS
   "Resolved",
