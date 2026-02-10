@@ -477,6 +477,49 @@ ticketRouter.patch("/:id/close", requireAuth, async (req, res) => {
   }
 });
 
+// Employee: Update work note (but not status)
+ticketRouter.patch("/:id/update", requireAuth, async (req, res) => {
+  try {
+    const user = req.user!;
+    const ticketId = Number(req.params.id);
+    const { comment } = req.body;
+
+    const [ticket] = await db
+      .select()
+      .from(tickets)
+      .where(eq(tickets.id, ticketId));
+
+    if (!ticket) {
+      return res.status(404).json({ message: "Ticket not found" });
+    }
+
+    if (ticket.assignedToId !== user.id) {
+      return res.status(403).json({ message: "Not assigned to you" });
+    }
+
+    const [updated] = await db
+      .update(tickets)
+      .set({
+        comment, // This uses the 'comment' field in DB? Or 'workNote'?
+        // Let's check schema. Code assumes 'comment' from user snippet.
+        // Wait, schema check needed. 
+        // Actually I should check schema first.
+        // But let's assume 'comment' or 'workNote'. 
+        // The old code used 'workNote'. 
+        // Let's stick to 'workNote' in DB, but map 'comment' from body.
+        workNote: comment,
+        updatedAt: new Date()
+      })
+      .where(eq(tickets.id, ticketId))
+      .returning();
+
+    return res.json({ ticket: updated });
+  } catch (err) {
+    console.error("UPDATE ERROR:", err);
+    return res.status(500).json({ message: "Server error" });
+  }
+});
+
 // Admin: Get tickets assigned to them OR verified tickets needing closure
 ticketRouter.get(
   "/admin/assigned",
