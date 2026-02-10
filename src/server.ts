@@ -20,6 +20,7 @@ app.use(
   cors({
     origin: [
       "https://hospital-mangement-system-mu.vercel.app",
+      "https://hospital-service-management.vercel.app",
       "http://localhost:5173",
     //  "http://localhost:4173",
     //  "https://hoserve.vercel.app",
