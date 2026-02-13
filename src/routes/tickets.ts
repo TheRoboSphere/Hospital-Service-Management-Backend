@@ -794,3 +794,164 @@ ticketRouter.get("/all", requireAuth, requireAdmin, async (req, res) => {
     return res.status(500).json({ message: "Server error" });
   }
 });
+
+// FRONTEND COMPAT: PATCH /tickets/:id/update
+ticketRouter.patch(
+  "/:id/update",
+  requireAuth,
+  async (req, res) => {
+    try {
+      const ticketId = Number(req.params.id);
+      const user = req.user!;
+      const { comment, status, priority, category } = req.body;
+
+      const [ticket] = await db
+        .select()
+        .from(tickets)
+        .where(eq(tickets.id, ticketId));
+
+      if (!ticket) {
+        return res.status(404).json({ message: "Ticket not found" });
+      }
+
+      // Unit-level security (same as your main update route)
+      if (user.role !== "admin" && user.unitId !== ticket.unitId) {
+        return res.status(403).json({ message: "Unauthorized" });
+      }
+
+      const [updated] = await db
+        .update(tickets)
+        .set({
+          comment: comment ?? ticket.comment,
+          status: status ?? ticket.status,
+          priority: priority ?? ticket.priority,
+          category: category ?? ticket.category,
+          updatedAt: new Date(),
+        })
+        .where(eq(tickets.id, ticketId))
+        .returning();
+
+      return res.json({ ticket: updated });
+    } catch (e) {
+      console.error("UPDATE (/update) ERROR:", e);
+      return res.status(500).json({ message: "Server error" });
+    }
+  }
+);
+
+
+// FRONTEND COMPAT: PATCH /tickets/:id/mark-done
+ticketRouter.patch(
+  "/:id/mark-done",
+  requireAuth,
+  async (req, res) => {
+    try {
+      const ticketId = Number(req.params.id);
+      const user = req.user!;
+
+      const [ticket] = await db
+        .select()
+        .from(tickets)
+        .where(eq(tickets.id, ticketId));
+
+      if (!ticket) {
+        return res.status(404).json({ message: "Ticket not found" });
+      }
+
+      // Only assigned employee can mark done
+      if (ticket.assignedEmployeeId !== user.id) {
+        return res.status(403).json({ message: "Not your ticket" });
+      }
+
+      const [updated] = await db
+        .update(tickets)
+        .set({
+          status: "Resolved",
+          updatedAt: new Date(),
+        })
+        .where(eq(tickets.id, ticketId))
+        .returning();
+
+      return res.json({ ticket: updated });
+    } catch (e) {
+      console.error("MARK DONE ERROR:", e);
+      return res.status(500).json({ message: "Server error" });
+    }
+  }
+);
+
+// FRONTEND COMPAT: PATCH /tickets/:id/manager-verify
+ticketRouter.patch(
+  "/:id/manager-verify",
+  requireAuth,
+  async (req, res) => {
+    try {
+      const ticketId = Number(req.params.id);
+      const user = req.user!;
+      const { note } = req.body;
+
+      if (user.role !== "manager") {
+        return res.status(403).json({ message: "Manager only" });
+      }
+
+      const [ticket] = await db
+        .select()
+        .from(tickets)
+        .where(eq(tickets.id, ticketId));
+
+      if (!ticket) {
+        return res.status(404).json({ message: "Ticket not found" });
+      }
+
+      const [updated] = await db
+        .update(tickets)
+        .set({
+          status: "Verified",
+          comment: note ?? ticket.comment,
+          updatedAt: new Date(),
+        })
+        .where(eq(tickets.id, ticketId))
+        .returning();
+
+      return res.json({ ticket: updated });
+    } catch (e) {
+      console.error("MANAGER VERIFY ERROR:", e);
+      return res.status(500).json({ message: "Server error" });
+    }
+  }
+);
+
+// FRONTEND COMPAT: PATCH /tickets/:id/close
+ticketRouter.patch(
+  "/:id/close",
+  requireAuth,
+  requireAdmin,
+  async (req, res) => {
+    try {
+      const ticketId = Number(req.params.id);
+
+      const [ticket] = await db
+        .select()
+        .from(tickets)
+        .where(eq(tickets.id, ticketId));
+
+      if (!ticket) {
+        return res.status(404).json({ message: "Ticket not found" });
+      }
+
+      const [updated] = await db
+        .update(tickets)
+        .set({
+          status: "Closed",
+          updatedAt: new Date(),
+        })
+        .where(eq(tickets.id, ticketId))
+        .returning();
+
+      return res.json({ ticket: updated });
+    } catch (e) {
+      console.error("CLOSE TICKET ERROR:", e);
+      return res.status(500).json({ message: "Server error" });
+    }
+  }
+);
