@@ -72,7 +72,7 @@ const app = express();
 
 const allowedOrigins = [
   "https://hospital-service-management.vercel.app",
-  "http://localhost:5173"
+ // "http://localhost:5173"
 ];
 
 app.use(cors({
@@ -104,7 +104,7 @@ app.get("/api/health", (req, res) => {
   res.json({ status: "ok" });
 });
 
-const PORT = process.env.PORT || 4000;
-app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
-});
+// const PORT = process.env.PORT || 4000;
+// app.listen(PORT, () => {
+//   console.log(`Server running on port ${PORT}`);
+// });
