@@ -653,26 +653,55 @@ ticketRouter.patch(
     }
   }
 );
-ticketRouter.patch(
-  "/:id/complete",
+// ticketRouter.patch(
+//   "/:id/complete",
+//   requireAuth,
+//   requireAdmin,
+//   async (req, res) => {
+//     try {
+//       const user = req.user!;
+
+//       // Fetch tickets where:
+//       // 1. Assigned directly to the admin (assignedToId = user.id)
+//       // 2. OR status is 'Verified' (waiting for admin closure)
+//       // 3. OR Created by the admin (so they can track what they raised)
+//       const rows = await db
+//         .select()
+//         .from(tickets)
+//         .where(
+//           sql`
+//             (${tickets.assignedToId} = ${user.id}) OR 
+//             (${tickets.status} = 'Verified') OR
+//             (${tickets.createdById} = ${user.id})
+//           `
+//         )
+//         .orderBy(desc(tickets.createdAt));
+
+//       return res.json({ tickets: rows });
+//     } catch (e) {
+//       console.error("ADMIN ASSIGNED FETCH ERROR:", e);
+//       return res.status(500).json({ message: "Server error" });
+//     }
+//   }
+// );
+
+// Admin: Get tickets assigned / created / verified (dashboard view)
+ticketRouter.get(
+  "/admin/assigned",
   requireAuth,
   requireAdmin,
   async (req, res) => {
     try {
       const user = req.user!;
 
-      // Fetch tickets where:
-      // 1. Assigned directly to the admin (assignedToId = user.id)
-      // 2. OR status is 'Verified' (waiting for admin closure)
-      // 3. OR Created by the admin (so they can track what they raised)
       const rows = await db
         .select()
         .from(tickets)
         .where(
           sql`
-            (${tickets.assignedToId} = ${user.id}) OR 
+            (${tickets.createdById} = ${user.id}) OR 
             (${tickets.status} = 'Verified') OR
-            (${tickets.createdById} = ${user.id})
+            (${tickets.assignedToId} IS NOT NULL)
           `
         )
         .orderBy(desc(tickets.createdAt));
@@ -684,6 +713,7 @@ ticketRouter.patch(
     }
   }
 );
+
 
 // Manager: Get tickets assigned to them
 ticketRouter.get(
