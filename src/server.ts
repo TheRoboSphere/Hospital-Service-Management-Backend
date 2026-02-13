@@ -69,6 +69,7 @@ import dashboardRouter from "./routes/Dashboard";
 import { unitRouter } from "./routes/units";
 
 const app = express();
+app.set("trust proxy", 1);
 
 const allowedOrigins = [
   "https://hospital-service-management.vercel.app",
