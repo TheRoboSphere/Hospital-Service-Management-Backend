@@ -48,80 +48,7 @@ authRouter.post("/seed", async (req, res) => {
   }
 });
 
-// REGISTER NEW USER (ADMIN ONLY)
-// authRouter.post("/register", async (req, res) => {
-//   try {
-//     const { name, email, password, phone, unitId, department,adminCode,Role } = req.body;
 
-//     // Validate
-//     if (!name || !email || !password || !phone) {
-//       return res.status(400).json({ message: "Missing required fields" });
-//     }
-//     type UserRole = "admin" | "employee" | "manager";
-
-//     let role: UserRole = "employee";
-    
-//     if (adminCode) {
-//       const isAdmin = await isValidAdminCode(adminCode);
-//       if (!isAdmin) {
-//         return res.status(401).json({ message: "Invalid admin code" });
-//       }
-//       role = "admin";
-//     }
-
-//     // Validate role
-//     if (!["admin", "employee"].includes(role)) {
-//       return res
-//         .status(400)
-//         .json({ message: "Role must be either 'admin' or 'employee'" });
-//     }
-
-//     // Employee MUST have a unit
-//     if (role === "employee" && !unitId) {
-//       return res.status(400).json({
-//         message: "Employee must be assigned to a unit",
-//       });
-//     }
-
-//     // Check if email already exists
-//     const existing = await findUserByEmail(email);
-//     if (existing) {
-//       return res.status(400).json({ message: "User already exists" });
-//     }
-
-//     // Hash password
-//     const passwordHash = await hashPassword(password);
-
-//     const inserted = await db
-//       .insert(users)
-//       .values({
-//         name,
-//         email,
-//         passwordHash,
-//         phoneNumber: phone,
-//         role,
-//         unitId: role === "employee" ? unitId : null,
-//       })
-//       .returning();
-
-//     const createdUser = inserted[0];
-
-//     return res.status(201).json({
-//       message: "User registered successfully",
-//       user: {
-//         id: createdUser.id,
-//         name: createdUser.name,
-//         email: createdUser.email,
-//         role: createdUser.role,
-//         unitId: createdUser.unitId,
-//         phoneNumber: createdUser.phoneNumber,
-//       },
-//     });
-//   } catch (error) {
-//     console.error("Register Error:", error);
-//     return res.status(500).json({ message: "Server error" });
-//   }
-// });
 
 authRouter.post("/register", async (req, res) => {
   try {
@@ -262,12 +189,20 @@ authRouter.post("/login", async (req, res) => {
     unitId: user.unitId ?? null,
   });
 
+  // res.cookie("token", token, {
+  //   httpOnly: true,
+  //   secure: true,
+  //   sameSite: "none",
+  //   maxAge: 7 * 24 * 60 * 60 * 1000,
+  // });
   res.cookie("token", token, {
-    httpOnly: true,
-    secure: true,
-    sameSite: "none",
-    maxAge: 7 * 24 * 60 * 60 * 1000,
-  });
+  httpOnly: true,
+  secure: true,        // REQUIRED (Render + Vercel = HTTPS)
+  sameSite: "none",    // MOST IMPORTANT for cross-origin
+  path: "/",
+  maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+});
+
 
   // --- NEW LOGIC BELOW --------------------------
 
