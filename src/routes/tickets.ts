@@ -841,6 +841,45 @@ ticketRouter.patch(
 
 
 // FRONTEND COMPAT: PATCH /tickets/:id/mark-done
+// ticketRouter.patch(
+//   "/:id/mark-done",
+//   requireAuth,
+//   async (req, res) => {
+//     try {
+//       const ticketId = Number(req.params.id);
+//       const user = req.user!;
+
+//       const [ticket] = await db
+//         .select()
+//         .from(tickets)
+//         .where(eq(tickets.id, ticketId));
+
+//       if (!ticket) {
+//         return res.status(404).json({ message: "Ticket not found" });
+//       }
+
+//       // Only assigned employee can mark done
+//       if (ticket.assignedEmployeeId !== user.id) {
+//         return res.status(403).json({ message: "Not your ticket" });
+//       }
+
+//       const [updated] = await db
+//         .update(tickets)
+//         .set({
+//           status: "Resolved",
+//           updatedAt: new Date(),
+//         })
+//         .where(eq(tickets.id, ticketId))
+//         .returning();
+
+//       return res.json({ ticket: updated });
+//     } catch (e) {
+//       console.error("MARK DONE ERROR:", e);
+//       return res.status(500).json({ message: "Server error" });
+//     }
+//   }
+// );
+// FRONTEND COMPAT: PATCH /tickets/:id/mark-done
 ticketRouter.patch(
   "/:id/mark-done",
   requireAuth,
@@ -858,8 +897,8 @@ ticketRouter.patch(
         return res.status(404).json({ message: "Ticket not found" });
       }
 
-      // Only assigned employee can mark done
-      if (ticket.assignedEmployeeId !== user.id) {
+      // 🔥 FIX: use assignedToId (your actual schema)
+      if (ticket.assignedToId !== user.id) {
         return res.status(403).json({ message: "Not your ticket" });
       }
 
