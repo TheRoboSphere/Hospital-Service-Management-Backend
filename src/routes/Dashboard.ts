@@ -68,7 +68,7 @@ router.get("/", requireAuth, async (req, res) => {
 
     const ticketStats = {
       total: ticketList.length,
-      open: ticketList.filter(t => t.status === "Open").length,
+      
       pending: ticketList.filter(t => t.status === "Pending").length,
       inProgress: ticketList.filter(t => t.status === "In Progress").length,
       resolved: ticketList.filter(t => t.status === "Resolved").length,
